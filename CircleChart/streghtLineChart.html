@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pie Chart with Subcategories & Labels Outside</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body { font-family: sans-serif; background: #f0f2f5; }
+  #chart {
+    max-width: 800px;
+    height: 500px;
+    margin: 40px auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  svg { width: 100%; height: 100%; }
+  .label {
+    font-size: 12px;
+    fill: #333;
+  }
+  .arc path, .subarc path {
+    stroke: #fff;
+    stroke-width: 1px;
+    transition: transform 0.3s, filter 0.3s;
+  }
+  .arc path:hover, .subarc path:hover {
+    filter: brightness(1.2);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<h3 style="text-align:center;">Pie Chart with Subcategories & Labels Outside</h3>
+<div id="chart"></div>
+
+<script>
+const data = [
+  { name: 'Iceland', value: 10.7, color: '#F6CAC9' },
+  { name: 'Greece', value: 10.2, color: '#F7A826' },
+  { name: 'Germany', value: 10.2, color: '#E69DAD' },
+  { name: 'Other', value: 21, color: '#B02525' }
+];
+
+const subcategories = {
+  'Iceland': [
+    { name: 'Reykjavik', value: 6, color: '#e6bebe' },
+    { name: 'Akureyri', value: 4.7, color: '#f8cccc' }
+  ],
+  'Greece': [
+    { name: 'Athens', value: 6.5, color: '#ffb733' },
+    { name: 'Thessaloniki', value: 3.7, color: '#e89c00' }
+  ],
+  'Germany': [
+    { name: 'Berlin', value: 5.8, color: '#dc8ab4' },
+    { name: 'Munich', value: 4.4, color: '#c274a6' }
+  ],
+  'Other': [
+    { name: 'Denmark', value: 4.1, color: '#5E3D66' },
+    { name: 'Finland', value: 4.2, color: '#9F92B3' },
+    { name: 'France', value: 5.3, color: '#816A9C' }
+  ]
+};
+
+const width = 800, height = 500, radius = Math.min(width, height) / 2 - 50;
+
+const svg = d3.select("#chart").append("svg")
+  .attr("viewBox", `0 0 ${width} ${height}`)
+  .append("g")
+  .attr("transform", `translate(${width/2},${height/2})`);
+
+const arc = d3.arc()
+  .innerRadius(0)
+  .outerRadius(radius);
+
+const pie = d3.pie()
+  .sort(null)
+  .value(d => d.value);
+
+// Group for main arcs
+const arcs = svg.selectAll(".arc")
+  .data(pie(data))
+  .enter().append("g")
+  .attr("class", "arc");
+
+// Draw pie slices
+arcs.append("path")
+  .attr("fill", d => d.data.color)
+  .transition()
+  .duration(800)
+  .attrTween("d", function(d) {
+    const i = d3.interpolate(d.startAngle + 0.1, d.endAngle);
+    return t => {
+      d.endAngle = i(t);
+      return arc(d);
+    }
+  });
+
+// Add connector lines
+arcs.append("polyline")
+  .attr("stroke", "#333")
+  .attr("stroke-width", 1)
+  .attr("fill", "none")
+  .attr("points", function(d) {
+    const posA = arc.centroid(d); // center
+    const posB = d3.arc().outerRadius(radius + 10).innerRadius(radius + 10).centroid(d); // just outside
+    const posC = d3.arc().outerRadius(radius + 50).innerRadius(radius + 50).centroid(d); // label pos
+    return [posA, posB, posC];
+  });
+
+// Add name label
+arcs.append("text")
+  .attr("transform", function(d) {
+    const pos = d3.arc().outerRadius(radius + 55).innerRadius(radius + 55).centroid(d);
+    return `translate(${pos})`;
+  })
+  .attr("dy", "-0.2em")
+  .attr("class", "label")
+  .style("text-anchor", function(d) {
+    const midAngle = (d.startAngle + d.endAngle) / 2;
+    return midAngle < Math.PI ? "start" : "end";
+  })
+  .text(d => d.data.name);
+
+// Add percentage label below
+arcs.append("text")
+  .attr("transform", function(d) {
+    const pos = d3.arc().outerRadius(radius + 55).innerRadius(radius + 55).centroid(d);
+    return `translate(${pos[0]},${pos[1]+12})`;
+  })
+  .attr("class", "label")
+  .style("text-anchor", function(d) {
+    const midAngle = (d.startAngle + d.endAngle) / 2;
+    return midAngle < Math.PI ? "start" : "end";
+  })
+  .text(d => `${d.data.value}%`);
+
+// Click to show subcategories (existing)
+arcs.selectAll("path")
+  .on("click", function(event, d) {
+    showSubcategories(d);
+    arcs.transition().duration(300).attr("transform", "translate(0,0)");
+    const midAngle = (d.startAngle + d.endAngle) / 2;
+    const offset = 15;
+    const x = Math.sin(midAngle) * offset;
+    const y = -Math.cos(midAngle) * offset;
+    d3.select(this.parentNode)
+      .transition().duration(300)
+      .attr("transform", `translate(${x},${y})`);
+  });
+
+// Group for subcategories
+const subG = svg.append("g").attr("class", "subcategories");
+
+function showSubcategories(d) {
+  const subs = subcategories[d.data.name];
+  if (!subs) return;
+  subG.selectAll("*").remove();
+
+  const subArc = d3.arc()
+    .innerRadius(radius + 40)
+    .outerRadius(radius + 100);
+
+  const subPie = d3.pie()
+    .startAngle(d.startAngle)
+    .endAngle(d.endAngle)
+    .sort(null)
+    .value(d => d.value);
+
+  const subArcs = subG.selectAll(".subarc")
+    .data(subPie(subs))
+    .enter().append("g")
+    .attr("class", "subarc");
+
+  subArcs.append("path")
+    .attr("fill", d => d.data.color)
+    .transition()
+    .duration(600)
+    .attrTween("d", function(d) {
+      const i = d3.interpolate(d.startAngle, d.endAngle);
+      return t => {
+        d.endAngle = i(t);
+        return subArc(d);
+      }
+    });
+
+  subArcs.append("text")
+    .attr("transform", d => `translate(${subArc.centroid(d)})`)
+    .attr("dy", "0.35em")
+    .attr("class", "label")
+    .text(d => d.data.name);
+}
+</script>
+</body>
+</html>

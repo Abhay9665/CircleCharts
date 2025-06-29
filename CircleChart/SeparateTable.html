@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colorful Animated Pie Chart with Table</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #eef1f5;
+    margin: 0;
+    padding: 20px;
+  }
+  h3 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  #container {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  #chart, #tableContainer {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    flex: 1;
+    min-width: 300px;
+    padding: 15px;
+  }
+  #tableContainer {
+    max-height: 400px;
+    overflow-y: auto;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+  }
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    margin-top: 10px;
+  }
+  th {
+    background: #f5f6fa;
+    color: #555;
+    font-weight: 600;
+    padding: 10px 15px;
+    text-align: left;
+    border-radius: 8px;
+  }
+  td {
+    padding: 10px 15px;
+    color: #333;
+    border-radius: 8px;
+    transition: background 0.3s;
+  }
+  tr:hover td {
+    filter: brightness(0.95);
+  }
+  svg {
+    width: 100%;
+    height: auto;
+  }
+  .label {
+    font-size: 12px;
+    fill: #444;
+    pointer-events: none;
+  }
+  .arc path {
+    stroke: #fff;
+    stroke-width: 2px;
+    cursor: pointer;
+    transition: transform 0.3s, filter 0.3s;
+  }
+  .arc path:hover {
+    filter: brightness(1.1);
+  }
+  #tableContent.fade-in {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+</style>
+</head>
+<body>
+<h3>Colorful Animated Pie Chart - Click to View Details</h3>
+<div id="container">
+  <div id="chart"></div>
+  <div id="tableContainer">
+    <h4 style="margin:0 0 10px 0; color:#444;">Subcategories</h4>
+    <div id="tableContent">Click on a category to view details.</div>
+  </div>
+</div>
+
+<script>
+const data = [
+  { name: 'Iceland', value: 10.7, color: '#6FB1FC' },
+  { name: 'Greece', value: 10.2, color: '#A27CF2' },
+  { name: 'Germany', value: 10.2, color: '#FF9F80' },
+  { name: 'Other', value: 21, color: '#F67280' }
+];
+
+const subcategories = {
+  'Iceland': [
+    { name: 'Reykjavik', value: 6, color: '#cce5ff' },
+    { name: 'Akureyri', value: 4.7, color: '#99ccff' }
+  ],
+  'Greece': [
+    { name: 'Athens', value: 6.5, color: '#d9ccff' },
+    { name: 'Thessaloniki', value: 3.7, color: '#b399ff' }
+  ],
+  'Germany': [
+    { name: 'Berlin', value: 5.8, color: '#ffd9cc' },
+    { name: 'Munich', value: 4.4, color: '#ffb399' }
+  ],
+  'Other': [
+    { name: 'Denmark', value: 4.1, color: '#ffcce0' },
+    { name: 'Finland', value: 4.2, color: '#ff99c2' },
+    { name: 'France', value: 5.3, color: '#ff66a3' }
+  ]
+};
+
+const width = 400, height = 400, radius = Math.min(width, height) / 2 - 20;
+
+const svg = d3.select("#chart").append("svg")
+  .attr("viewBox", `0 0 ${width} ${height}`)
+  .append("g")
+  .attr("transform", `translate(${width/2},${height/2})`);
+
+const arc = d3.arc().innerRadius(0).outerRadius(radius);
+const pie = d3.pie().sort(null).value(d => d.value);
+
+// Draw slices with animation
+const arcs = svg.selectAll(".arc")
+  .data(pie(data))
+  .enter().append("g")
+  .attr("class", "arc");
+
+arcs.append("path")
+  .attr("fill", d => d.data.color)
+  .transition()
+  .duration(800)
+  .attrTween("d", function(d) {
+    const i = d3.interpolate(d.startAngle, d.endAngle);
+    return t => {
+      d.endAngle = i(t);
+      return arc(d);
+    }
+  })
+  .on("end", function() {
+    d3.select(this).on("click", (event, d) => onSliceClick(event, d));
+  });
+
+// Add labels with name and percentage
+arcs.append("text")
+  .attr("transform", d => `translate(${arc.centroid(d)})`)
+  .attr("dy", "0.35em")
+  .attr("class", "label")
+  .style("text-anchor", "middle")
+  .text(d => `${d.data.name} (${d.data.value}%)`);
+
+let activeSlice = null;
+
+function onSliceClick(event, d) {
+  // Remove highlight from previous
+  if (activeSlice) {
+    activeSlice.transition().duration(200).attr("transform", "translate(0,0)");
+  }
+
+  // Highlight clicked
+  const midAngle = (d.startAngle + d.endAngle) / 2;
+  const offset = 10;
+  const x = Math.sin(midAngle) * offset;
+  const y = -Math.cos(midAngle) * offset;
+
+  d3.select(event.currentTarget.parentNode)
+    .transition().duration(300)
+    .attr("transform", `translate(${x},${y})`);
+
+  activeSlice = d3.select(event.currentTarget.parentNode);
+
+  // Show animated colorful table
+  showTable(d.data.name);
+}
+
+function showTable(category) {
+  const subs = subcategories[category];
+  const contentDiv = document.getElementById("tableContent");
+  
+  if (!subs) {
+    contentDiv.innerHTML = "No data";
+    return;
+  }
+
+  // Fade out then fade in
+  contentDiv.classList.add("fade-in");
+  setTimeout(() => {
+    let html = `<table>
+      <tr><th>Subcategory</th><th>Value</th></tr>`;
+    subs.forEach(sub => {
+      html += `<tr>
+        <td style="background:${sub.color}">${sub.name}</td>
+        <td style="background:${sub.color}">${sub.value}</td>
+      </tr>`;
+    });
+    html += `</table>`;
+    contentDiv.innerHTML = html;
+    contentDiv.classList.remove("fade-in");
+  }, 200);
+}
+</script>
+</body>
+</html>

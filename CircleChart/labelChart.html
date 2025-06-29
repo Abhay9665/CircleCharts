@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pie Chart with Subcategory Labels & Padding</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body { font-family: sans-serif; background: #f0f2f5; }
+  #chart {
+    max-width: 600px;
+    height: 600px;
+    margin: 40px auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  svg { width: 100%; height: 100%; }
+  .label {
+    font-size: 18px;
+    text-anchor: middle;
+    fill: #333;
+    pointer-events: none;
+  }
+  .arc path {
+    stroke: #fff;
+    stroke-width: 1px;
+    transition: transform 0.3s, filter 0.3s;
+  }
+  .arc path:hover {
+    filter: brightness(1.2);
+    cursor: pointer;
+  }
+  .rope {
+    fill: none;
+    stroke: #999;
+    stroke-width: 1.5;
+    stroke-dasharray: 3,3;
+  }
+</style>
+</head>
+<body>
+<h3 style="text-align:center;">Pie Chart with Subcategory Labels & Padding</h3>
+<div id="chart"></div>
+
+<script>
+const data = [
+  { name: 'Iceland', value: 10.7, color: '#F6CAC9' },
+  { name: 'Greece', value: 10.2, color: '#F7A826' },
+  { name: 'Germany', value: 10.2, color: '#E69DAD' },
+  { name: 'Other', value: 21, color: '#B02525' }
+];
+
+const subcategories = {
+  'Iceland': [
+    { name: 'Reykjavik', value: 6, color: '#e6bebe' },
+    { name: 'Akureyri', value: 4.7, color: '#f8cccc' }
+  ],
+  'Greece': [
+    { name: 'Athens', value: 6.5, color: '#ffb733' },
+    { name: 'Thessaloniki', value: 3.7, color: '#e89c00' }
+  ],
+  'Germany': [
+    { name: 'Berlin', value: 5.8, color: '#dc8ab4' },
+    { name: 'Munich', value: 4.4, color: '#c274a6' }
+  ],
+  'Other': [
+    { name: 'Denmark', value: 4.1, color: '#5E3D66' },
+    { name: 'Finland', value: 4.2, color: '#9F92B3' },
+    { name: 'France', value: 5.3, color: '#816A9C' }
+  ]
+};
+
+const width = 800, height = 500, radius = Math.min(width, height) / 2 - 50;
+
+const svg = d3.select("#chart").append("svg")
+  .attr("viewBox", `0 0 ${width} ${height}`)
+  .append("g")
+  .attr("transform", `translate(${width/2},${height/2})`);
+
+const arc = d3.arc().innerRadius(0).outerRadius(radius);
+const pie = d3.pie().sort(null).value(d => d.value);
+
+// Draw main pie
+const arcs = svg.selectAll(".arc")
+  .data(pie(data))
+  .enter().append("g")
+  .attr("class", "arc");
+
+arcs.append("path")
+  .attr("fill", d => d.data.color)
+  .transition().duration(800)
+  .attrTween("d", function(d) {
+    const i = d3.interpolate(d.startAngle+0.1, d.endAngle);
+    return t => { d.endAngle = i(t); return arc(d); }
+  });
+
+arcs.append("text")
+  .attr("transform", d => `translate(${arc.centroid(d)})`)
+  .attr("dy", "0.35em")
+  .attr("class", "label")
+  .text(d => d.data.name);
+
+arcs.on("click", function(event, d) {
+  showSubcategories(d);
+  arcs.transition().duration(300).attr("transform", "translate(0,0)");
+  const mid = (d.startAngle + d.endAngle)/2;
+  const x = Math.sin(mid) * 15;
+  const y = -Math.cos(mid) * 15;
+  d3.select(this).transition().duration(300).attr("transform", `translate(${x},${y})`);
+});
+
+const subG = svg.append("g").attr("class", "subcategories");
+
+function showSubcategories(d) {
+  subG.selectAll("*").remove();
+  const subs = subcategories[d.data.name];
+  if (!subs) return;
+
+  const midAngle = (d.startAngle + d.endAngle)/2;
+  const centerX = Math.sin(midAngle) * radius * 0.7;
+  const centerY = -Math.cos(midAngle) * radius * 0.7;
+
+  const angleStep = (d.endAngle - d.startAngle) / (subs.length+1);
+
+  subs.forEach((sub, i) => {
+    const angle = d.startAngle + angleStep*(i+1);
+    const x = Math.sin(angle) * (radius+80);
+    const y = -Math.cos(angle) * (radius+80);
+
+    // Draw rope
+    const cpX = (centerX + x)/2 + (Math.random()>0.5 ? 20 : -20);
+    const cpY = (centerY + y)/2 + (Math.random()>0.5 ? 20 : -20);
+
+    subG.append("path")
+      .attr("class", "rope")
+      .attr("d", `M${centerX},${centerY} Q${cpX},${cpY} ${x},${y}`)
+      .attr("opacity", 0)
+      .transition().duration(500).attr("opacity", 1);
+
+    // Add group for background + text
+    const g = subG.append("g")
+      .attr("transform", `translate(${x},${y})`)
+      .attr("opacity", 0)
+      .transition().duration(500)
+      .attr("opacity", 1)
+      .selection();
+
+    // Add text first to measure
+    const text = g.append("text")
+      .text(sub.name)
+      .attr("class", "label")
+      .attr("dy", "0.35em");
+
+    text.each(function() {
+      const bbox = this.getBBox();
+      const paddingX = 8; // horizontal padding
+      const paddingY = 4; // vertical padding
+
+      g.insert("rect", "text")
+        .attr("x", bbox.x - paddingX)
+        .attr("y", bbox.y - paddingY)
+        .attr("width", bbox.width + paddingX*2)
+        .attr("height", bbox.height + paddingY*2)
+        .attr("rx", 4)
+        .attr("ry", 4)
+        .attr("fill", sub.color)
+        .attr("opacity", 0.8);
+    });
+  });
+}
+</script>
+</body>
+</html>
+
+
+
