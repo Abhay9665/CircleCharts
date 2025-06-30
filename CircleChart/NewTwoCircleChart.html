@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D3 Dynamic Pie with Subcategories (No Bootstrap)</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background: white;
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    .container {
+      display: flex;
+      align-items: flex-start;
+    }
+    .legend {
+      display: flex;
+      flex-direction: column;
+      margin-left: 20px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <svg id="chart" width="800" height="400"></svg>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background:#36A2EB;"></div> Coffee</div>
+    <div class="legend-item"><div class="legend-color" style="background:#FF6384;"></div> Biscuits</div>
+    <div class="legend-item"><div class="legend-color" style="background:#4BC0C0;"></div> Tea</div>
+    <div class="legend-item"><div class="legend-color" style="background:#9966FF;"></div> Vegetables</div>
+    <div class="legend-item"><div class="legend-color" style="background:#FF9F40;"></div> Fruits</div>
+    <div class="legend-item"><div class="legend-color" style="background:#FFCD56;"></div> Chips</div>
+    <div class="legend-item"><div class="legend-color" style="background:#7CB342;"></div> Drinks</div>
+  </div>
+</div>
+
+<script>
+const width = 800, height = 400;
+const svg = d3.select("#chart")
+  .attr("width", width)
+  .attr("height", height);
+
+// Data
+const mainData = [
+  { label: 'Coffee', value: 10, color: '#36A2EB' },
+  { label: 'Biscuits', value: 20, color: '#FF6384' },
+  { label: 'Tea', value: 15, color: '#4BC0C0' },
+  { label: 'Vegetables', value: 25, color: '#9966FF' },
+  { label: 'Fruits', value: 10, color: '#FF9F40' },
+  { label: 'Chips', value: 10, color: '#FFCD56' },
+  { label: 'Drinks', value: 10, color: '#7CB342' }
+];
+
+const subcategories = {
+  'Coffee': [
+    { label: 'Espresso', value: 60, color: '#36A2EB' },
+    { label: 'Latte', value: 40, color: '#5cc3ff' }
+  ],
+  'Biscuits': [
+    { label: 'Chocolate', value: 50, color: '#FF6384' },
+    { label: 'Butter', value: 30, color: '#ff8aa3' },
+    { label: 'Oats', value: 20, color: '#ffc1cc' }
+  ],
+  'Tea': [
+    { label: 'Green', value: 70, color: '#4BC0C0' },
+    { label: 'Black', value: 30, color: '#80d9d9' }
+  ],
+  'Vegetables': [
+    { label: 'Carrots', value: 40, color: '#9966FF' },
+    { label: 'Peas', value: 30, color: '#b68cff' },
+    { label: 'Corn', value: 30, color: '#d3b3ff' }
+  ],
+  'Fruits': [
+    { label: 'Apple', value: 50, color: '#FF9F40' },
+    { label: 'Banana', value: 50, color: '#ffbf80' }
+  ],
+  'Chips': [
+    { label: 'Potato', value: 100, color: '#FFCD56' }
+  ],
+  'Drinks': [
+    { label: 'Soda', value: 60, color: '#7CB342' },
+    { label: 'Juice', value: 40, color: '#a5d16c' }
+  ]
+};
+
+const pie = d3.pie().value(d => d.value).sort(null);
+const arc = d3.arc().innerRadius(0).outerRadius(100);
+const subArc = d3.arc().innerRadius(0).outerRadius(80);
+
+// Main pie
+const mainGroup = svg.append("g")
+  .attr("transform", `translate(200,200)`);
+
+const mainPaths = mainGroup.selectAll("path")
+  .data(pie(mainData))
+  .enter().append("path")
+  .attr("d", arc)
+  .attr("fill", d => d.data.color)
+  .attr("stroke", "white")
+  .attr("stroke-width", 1)
+  .style("cursor", "pointer")
+  .on("click", (event, d) => updateSubPie(d.data.label));
+
+// Sub pie
+const subGroup = svg.append("g")
+  .attr("transform", `translate(500,200)`);
+
+// Initialize with first category
+updateSubPie(mainData[0].label);
+
+function updateSubPie(category) {
+  const data = subcategories[category] || [];
+  const subData = pie(data);
+
+  const paths = subGroup.selectAll("path")
+    .data(subData);
+
+  paths.exit().remove();
+
+  paths
+    .transition().duration(500)
+    .attr("d", subArc)
+    .attr("fill", d => d.data.color);
+
+  paths.enter().append("path")
+    .attr("d", subArc)
+    .attr("fill", d => d.data.color)
+    .attr("stroke", "white")
+    .attr("stroke-width", 1);
+}
+
+// Add connecting lines (static)
+svg.append("line")
+  .attr("x1", 200+arc.centroid(pie(mainData)[1])[0])
+  .attr("y1", 200+arc.centroid(pie(mainData)[1])[1])
+  .attr("x2", 500)
+  .attr("y2", 150)
+  .attr("stroke", "black")
+  .attr("stroke-width", 1);
+
+svg.append("line")
+  .attr("x1", 200+arc.centroid(pie(mainData)[1])[0])
+  .attr("y1", 200+arc.centroid(pie(mainData)[1])[1])
+  .attr("x2", 500)
+  .attr("y2", 250)
+  .attr("stroke", "black")
+  .attr("stroke-width", 1);
+</script>
+</body>
+</html>
